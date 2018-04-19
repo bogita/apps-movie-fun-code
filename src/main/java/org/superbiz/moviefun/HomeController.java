@@ -1,6 +1,7 @@
 package org.superbiz.moviefun;
 
 import org.springframework.stereotype.Controller;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.superbiz.moviefun.albums.Album;
 import org.superbiz.moviefun.albums.AlbumFixtures;
@@ -18,12 +19,17 @@ public class HomeController {
     private final AlbumsBean albumsBean;
     private final MovieFixtures movieFixtures;
     private final AlbumFixtures albumFixtures;
+    private final TransactionTemplate moviesTransactionTemplate;
+    private final TransactionTemplate albumsTransactionTemplate;
 
-    public HomeController(MoviesBean moviesBean, AlbumsBean albumsBean, MovieFixtures movieFixtures, AlbumFixtures albumFixtures) {
+    public HomeController(MoviesBean moviesBean, AlbumsBean albumsBean, MovieFixtures movieFixtures, AlbumFixtures albumFixtures,
+                          TransactionTemplate moviesTransactionTemplate, TransactionTemplate albumsTransactionTemplate) {
         this.moviesBean = moviesBean;
         this.albumsBean = albumsBean;
         this.movieFixtures = movieFixtures;
         this.albumFixtures = albumFixtures;
+        this.moviesTransactionTemplate = moviesTransactionTemplate;
+        this.albumsTransactionTemplate = albumsTransactionTemplate;
     }
 
     @GetMapping("/")
@@ -33,17 +39,29 @@ public class HomeController {
 
     @GetMapping("/setup")
     public String setup(Map<String, Object> model) {
-        for (Movie movie : movieFixtures.load()) {
-            moviesBean.addMovie(movie);
-        }
-
-        for (Album album : albumFixtures.load()) {
-            albumsBean.addAlbum(album);
-        }
-
+        createMovies();
+        createAlbums();
         model.put("movies", moviesBean.getMovies());
         model.put("albums", albumsBean.getAlbums());
 
         return "setup";
+    }
+
+    private void createMovies(){
+        moviesTransactionTemplate.execute(transactionStatus -> {
+            for (Movie movie : movieFixtures.load()) {
+                moviesBean.addMovie(movie);
+            }
+            return null;
+        });
+    }
+
+    private void createAlbums(){
+        albumsTransactionTemplate.execute(transactionStatus -> {
+            for (Album album : albumFixtures.load()) {
+                albumsBean.addAlbum(album);
+            }
+            return null;
+        });
     }
 }
