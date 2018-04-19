@@ -18,6 +18,9 @@ package org.superbiz.moviefun;
 
 import org.apache.commons.lang.StringUtils;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.support.TransactionTemplate;
+import org.superbiz.moviefun.movies.Movie;
+import org.superbiz.moviefun.movies.MoviesBean;
 
 import javax.ejb.EJB;
 import javax.servlet.ServletException;
@@ -34,11 +37,17 @@ import java.util.List;
 public class ActionServlet extends HttpServlet {
 
     private static final long serialVersionUID = -5832176047021911038L;
-
     public static int PAGE_SIZE = 5;
+    private final TransactionTemplate moviesTransactionTemplate;
+    private final TransactionTemplate albumsTransactionTemplate;
 
     @EJB
     private MoviesBean moviesBean;
+
+    public ActionServlet(TransactionTemplate moviesTransactionTemplate, TransactionTemplate albumsTransactionTemplate){
+        this.moviesTransactionTemplate = moviesTransactionTemplate;
+        this.albumsTransactionTemplate = albumsTransactionTemplate;
+    }
 
     @Override
     protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
@@ -63,16 +72,23 @@ public class ActionServlet extends HttpServlet {
 
             Movie movie = new Movie(title, director, genre, rating, year);
 
-            moviesBean.addMovie(movie);
+            moviesTransactionTemplate.execute(transactionStatus -> {
+                moviesBean.addMovie(movie);
+                return null;
+            });
+
             response.sendRedirect("moviefun");
             return;
 
         } else if ("Remove".equals(action)) {
 
             String[] ids = request.getParameterValues("id");
-            for (String id : ids) {
-                moviesBean.deleteMovieId(new Long(id));
-            }
+            moviesTransactionTemplate.execute(transactionStatus -> {
+                for (String id : ids) {
+                    moviesBean.deleteMovieId(new Long(id));
+                }
+                return null;
+            });
 
             response.sendRedirect("moviefun");
             return;
